@@ -1,10 +1,10 @@
-「WebMail Notifier( http://dreamcheeky.com/webmail-notifier )」という新着メールを光ってお知らせしてくれる製品を、
-好き勝手に点灯させるためのプログラムです。
-
-
-
 https://github.com/ashel/webmailwindow
 からForkさせていただきました。
+
+
+
+「WebMail Notifier( http://dreamcheeky.com/webmail-notifier )」という新着メールを光ってお知らせしてくれる製品を
+好き勝手に点灯させるためのプログラムです。
 
 どうやら複数バージョン出回っているらしく、
 新しい製品ではうまく動かなかったため、動くように改造しました。
