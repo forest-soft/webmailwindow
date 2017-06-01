@@ -39,10 +39,10 @@ Routine Description:
    the system at this time.
 --*/
 {
-    HDEVINFO                            hardwareDeviceInfo;
+    HDEVINFO                            hardwareDeviceInfo = INVALID_HANDLE_VALUE;
     SP_DEVICE_INTERFACE_DATA            deviceInfoData;
     ULONG                               i;
-    BOOLEAN                             done;
+    BOOLEAN                             done = FALSE;
     PHID_DEVICE                         hidDeviceInst;
     GUID                                hidGuid;
     PSP_DEVICE_INTERFACE_DETAIL_DATA    functionClassDeviceData = NULL;
@@ -55,7 +55,7 @@ Routine Description:
 
     *HidDevices = NULL;
     *NumberDevices = 0;
-
+    
     //
     // Open a handle to the plug and play dev node.
     //
@@ -67,7 +67,7 @@ Routine Description:
 
     if (INVALID_HANDLE_VALUE == hardwareDeviceInfo)
     {
-        return FALSE;
+        goto Done;
     }
 
     //
@@ -102,14 +102,20 @@ Routine Description:
 
         if (NULL == *HidDevices) 
         {
-            SetupDiDestroyDeviceInfoList (hardwareDeviceInfo);
-            return FALSE;
+            goto Done;
         }
 
         hidDeviceInst = *HidDevices + i;
 
         for (; i < *NumberDevices; i++, hidDeviceInst++) 
         {
+            //
+            // Initialize an empty HID_DEVICE
+            //
+            RtlZeroMemory(hidDeviceInst,sizeof(HID_DEVICE));
+
+            hidDeviceInst -> HidDevice = INVALID_HANDLE_VALUE;
+
             if (SetupDiEnumDeviceInterfaces (hardwareDeviceInfo,
                                              0, // No care about specific PDOs
                                              &hidGuid,
@@ -140,15 +146,14 @@ Routine Description:
                 }
                 else
                 {
-                    SetupDiDestroyDeviceInfoList (hardwareDeviceInfo);
-                    return FALSE;
+                    goto Done;
                 }
 
                 //
                 // Retrieve the information from Plug and Play.
                 //
 
-                if (! SetupDiGetDeviceInterfaceDetail (
+                if (SetupDiGetDeviceInterfaceDetail (
                            hardwareDeviceInfo,
                            &deviceInfoData,
                            functionClassDeviceData,
@@ -156,28 +161,36 @@ Routine Description:
                            &requiredLength,
                            NULL)) 
                 {
-                    SetupDiDestroyDeviceInfoList (hardwareDeviceInfo);
-                    free(functionClassDeviceData);
-                    return FALSE;
+                    //
+                    // Open device with just generic query abilities to begin with
+                    //
+
+                    if (! OpenHidDevice (functionClassDeviceData -> DevicePath, 
+                                   FALSE,      // ReadAccess - none
+                                   FALSE,      // WriteAccess - none
+                                   FALSE,       // Overlapped - no
+                                   FALSE,       // Exclusive - no
+                                   hidDeviceInst))
+                    {
+                        //
+                        // Save the device path so it can be still listed.
+                        //
+                        INT     iDevicePathSize;
+
+                        iDevicePathSize = (INT)strlen(functionClassDeviceData -> DevicePath) + 1;
+
+                        hidDeviceInst -> DevicePath = malloc(iDevicePathSize);
+
+                        if (NULL != hidDeviceInst -> DevicePath) 
+                        {
+                            StringCbCopy(hidDeviceInst -> DevicePath, iDevicePathSize, functionClassDeviceData -> DevicePath);
+                        }
+                    }
                 }
 
-                //
-                // Open device with just generic query abilities to begin with
-                //
-                
-                if (! OpenHidDevice (functionClassDeviceData -> DevicePath, 
-                               FALSE,      // ReadAccess - none
-                               FALSE,      // WriteAccess - none
-                               FALSE,       // Overlapped - no
-                               FALSE,       // Exclusive - no
-                               hidDeviceInst))
-                {
-                    SetupDiDestroyDeviceInfoList (hardwareDeviceInfo);
-                    free(functionClassDeviceData);
-                    return FALSE;
-                }
-
-            } 
+                free(functionClassDeviceData);
+                functionClassDeviceData = NULL;
+            }
             else
             {
                 if (ERROR_NO_MORE_ITEMS == GetLastError()) 
@@ -191,9 +204,23 @@ Routine Description:
 
     *NumberDevices = i;
 
-    SetupDiDestroyDeviceInfoList (hardwareDeviceInfo);
-    free(functionClassDeviceData);
-    return TRUE;
+Done:
+    if (FALSE == done)
+    {
+        if (NULL != *HidDevices)
+        {
+            free(*HidDevices);
+            *HidDevices = NULL;
+        }
+    }
+
+    if (INVALID_HANDLE_VALUE != hardwareDeviceInfo)
+    {
+        SetupDiDestroyDeviceInfoList (hardwareDeviceInfo);
+        hardwareDeviceInfo = INVALID_HANDLE_VALUE;
+    }
+
+    return done;
 }
 
 BOOLEAN
