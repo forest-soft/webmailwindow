@@ -21,7 +21,6 @@ https://github.com/ashel/webmailwindow
 https://www.microsoft.com/en-us/download/details.aspx?id=11800
 
 2. スタートメニューを開き、全てのプログラムの中から「Windows Driver Kits - x86 Free Build Environment」を選びます。
-　するとコマンドプロンプトが開きます。
 
 3. コマンドプロンプトが開くので、プロジェクトルートディレクトリまで移動します。
 　cd {～\webmailwindow}
