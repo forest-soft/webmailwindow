@@ -27,8 +27,13 @@ Environment:
 // Local macro definitions
 //****************************************************************************
 
-#define WEBMAILWINDOW_VENDERID  0x1294
-#define WEBMAILWINDOW_PRODUCTID 0x1320
+// 旧ID
+//#define WEBMAILWINDOW_VENDERID  0x1294
+//#define WEBMAILWINDOW_PRODUCTID 0x1320
+
+// 新ID
+#define WEBMAILWINDOW_VENDERID  0x1d34
+#define WEBMAILWINDOW_PRODUCTID 0x0004
 
 //****************************************************************************
 // Data types local to the HClient display routines
@@ -182,10 +187,54 @@ PDEVICE_LIST_NODE FindWebMailWindowNode()
     return NULL;
 }
 
+BOOL WriteHID(PHID_DEVICE HidDevice, PCHAR pucBuffer, int nWriteLength, int *nActualLength)
+{
+    DWORD bytesWritten;
+	DWORD dwBufCount = 0;
+	WORD wCount;
+
+	*nActualLength = 0;
+	while(*nActualLength < nWriteLength) {
+		for(wCount=1; wCount<HidDevice->Caps.OutputReportByteLength; wCount++) {
+			if(dwBufCount < (DWORD)nWriteLength) {
+				HidDevice->OutputReportBuffer[wCount] = pucBuffer[dwBufCount++];
+			} else {
+				HidDevice->OutputReportBuffer[wCount] = 0;
+			}
+		}
+
+		HidDevice->OutputReportBuffer[0] = 0;
+		if (!WriteFile (HidDevice->HidDevice,
+				  HidDevice->OutputReportBuffer,
+				  HidDevice->Caps.OutputReportByteLength,
+				  &bytesWritten,
+				  NULL) && (bytesWritten == HidDevice -> Caps.OutputReportByteLength)) 
+		{
+			return FALSE;
+		}
+
+		(*nActualLength) += (HidDevice->Caps.OutputReportByteLength - 1);
+	}
+	
+	return TRUE;
+}
+
+
 BOOL SetLedPattern(PHID_DEVICE device, ULONG pattern_value)
 {
+	// 初期化データを送る。
+	char start1_cCBWBuf[8] = {31, 2, 0, 95, 0, 0, 31, 3};
+	char start2_cCBWBuf[8] = {0, 2, 0, 95, 0, 0, 31, 4};
+	char start3_cCBWBuf[8] = {0, 0, 0, 0, 0, 0, 31, 5};
+	
+	
+	char cCBWBuf[8] = {0, 0, 0, 0, 0, 0, 31, 5};
+	int nReturnedLength;
+	
     HID_DEVICE                       writeDevice;
     BOOL                             status;
+    
+    char LED_VALUE = 64;
     
     ZeroMemory(&writeDevice, sizeof(writeDevice));
     
@@ -211,7 +260,30 @@ BOOL SetLedPattern(PHID_DEVICE device, ULONG pattern_value)
         // set LED color value
         writeDevice.OutputData->ValueData.Value = pattern_value;
         
-        Write(&writeDevice);
+        if (pattern_value & 0x2)
+        {
+			// 赤
+			cCBWBuf[0] = LED_VALUE;
+		}
+		
+		if (pattern_value & 0x1)
+		{
+			// 緑
+			cCBWBuf[1] = LED_VALUE;
+		}
+		
+		if (pattern_value & 0x4)
+		{
+			// 青
+			cCBWBuf[2] = LED_VALUE;
+		}
+        
+        //Write(&writeDevice);
+        
+        WriteHID(&writeDevice, start1_cCBWBuf, 8, &nReturnedLength);
+        WriteHID(&writeDevice, start2_cCBWBuf, 8, &nReturnedLength);
+        WriteHID(&writeDevice, start3_cCBWBuf, 8, &nReturnedLength);
+        WriteHID(&writeDevice, cCBWBuf, 8, &nReturnedLength);
         
         CloseHidDevice(&writeDevice);
         return TRUE;
@@ -245,6 +317,7 @@ int ParseOptionsForLedPattern(ULONG argc, PCHAR argv[])
             if (strstr(pattern, "b")) {
                 mask |= 0x4;
             }
+            
             if (mask > 0) {
                 led_pattern = mask;
             } else if (strncmp("none", pattern, 4) == 0) {
@@ -305,6 +378,6 @@ main(
     if ( ! IsListEmpty(&PhysicalDeviceList)) {
         DestroyListWithCallback(&PhysicalDeviceList, DestroyDeviceListCallback);
     }
-
+    
     return retval;
 }
