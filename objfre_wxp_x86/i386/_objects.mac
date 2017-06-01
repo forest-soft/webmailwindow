@@ -1,0 +1,18 @@
+
+
+386_OBJECTS=\
+ $(OBJ_PATH)\$O\webmailwindow.obj \
+ $(OBJ_PATH)\$O\pnp.obj \
+ $(OBJ_PATH)\$O\report.obj \
+
+
+
+
+
+# lowercased
+BASEDIR=c:\winddk\7600.16385.1
+OBJECT_ROOT=c:\winddk\7600.16385.1
+MAKEDIR_LOWERCASE=c:\work\git\webmailwindow
+OBJ_PATH=c:\work\git\webmailwindow
+CONCURRENT_MIDL=0
+CONCURRENT_MANIFEST_BUILD=0
